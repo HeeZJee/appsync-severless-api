@@ -1,33 +1,48 @@
-import * as cdk from "aws-cdk-lib";
-import { Construct } from "constructs";
-// import * as sqs from 'aws-cdk-lib/aws-sqs';
+import * as cdk from "@aws-cdk/core";
+import * as appsync from "@aws-cdk/aws-appsync";
+import * as lambda from "@aws-cdk/aws-lambda";
+import path = require("path");
 
 export class ServerlessApiStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const lambdaFnRestApi = new cdk.aws_lambda.Function(
+    const appsyncApi = new appsync.GraphqlApi(this, "Api", {
+      name: "Serverless CDK AppSync API",
+      schema: appsync.Schema.fromAsset(
+        path.join(__dirname, "schema/schema.graphql")
+      ),
+    });
+
+    const lambdaFnRestApi = new lambda.Function(
       this,
       "ServerlessCDKApiFunction",
       {
         functionName: "ServerlessCDKApiFunction",
-        runtime: cdk.aws_lambda.Runtime.NODEJS_16_X,
-        code: cdk.aws_lambda.Code.fromAsset("lambda"),
+        runtime: lambda.Runtime.NODEJS_16_X,
+        code: lambda.Code.fromAsset("lambda"),
         handler: "index.handler",
       }
     );
 
-    const apiGateway = new cdk.aws_apigateway.LambdaRestApi(
-      this,
-      "ServerlessCDKApi",
-      {
-        handler: lambdaFnRestApi,
-        proxy: false,
-      }
+    const DataSource = appsyncApi.addLambdaDataSource(
+      "lambdaDataSource",
+      lambdaFnRestApi
     );
 
-    const items = apiGateway.root.addResource("items");
-    items.addMethod("GET");
-    items.addMethod("POST");
+    DataSource.createResolver({
+      typeName: "Query",
+      fieldName: "getTodos",
+    });
+
+    DataSource.createResolver({
+      typeName: "Mutation",
+      fieldName: "addTodo",
+    });
+
+    DataSource.createResolver({
+      typeName: "Mutation",
+      fieldName: "updateTodo",
+    });
   }
 }
