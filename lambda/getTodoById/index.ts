@@ -3,14 +3,17 @@ const AWS = require("aws-sdk");
 
 const docClient = new AWS.DynamoDB.DocumentClient();
 
-export async function getTodos(): Promise<Todo[]> {
+export async function getTodoById(id: string): Promise<Todo> {
   const params = {
     TableName: process.env.TODOS_TABLE,
+    Key: {
+      id: id,
+    },
   };
 
   try {
-    const { Items: todos } = await docClient.scan(params).promise();
-    return todos;
+    const {Item} = await docClient.get(params).promise();
+    return Item;
   } catch (error) {
     console.error("DynamoDB error: ", error);
     return Promise.reject(error);

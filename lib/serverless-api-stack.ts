@@ -1,6 +1,7 @@
 import * as cdk from "@aws-cdk/core";
 import * as appsync from "@aws-cdk/aws-appsync";
 import * as lambda from "@aws-cdk/aws-lambda";
+import * as dynamodb from "@aws-cdk/aws-dynamodb";
 import path = require("path");
 
 export class ServerlessApiStack extends cdk.Stack {
@@ -10,11 +11,11 @@ export class ServerlessApiStack extends cdk.Stack {
     const appsyncApi = new appsync.GraphqlApi(this, "Api", {
       name: "Serverless CDK AppSync API",
       schema: appsync.Schema.fromAsset(
-        path.join(__dirname, "schema/schema.graphql")
+        path.join(__dirname, "../schema/schema.graphql")
       ),
     });
 
-    const lambdaFnRestApi = new lambda.Function(
+    const lambdaFnTodos = new lambda.Function(
       this,
       "ServerlessCDKApiFunction",
       {
@@ -27,12 +28,16 @@ export class ServerlessApiStack extends cdk.Stack {
 
     const DataSource = appsyncApi.addLambdaDataSource(
       "lambdaDataSource",
-      lambdaFnRestApi
+      lambdaFnTodos
     );
 
     DataSource.createResolver({
       typeName: "Query",
       fieldName: "getTodos",
+    });
+    DataSource.createResolver({
+      typeName: "Query",
+      fieldName: "getTodoById",
     });
 
     DataSource.createResolver({
@@ -42,7 +47,23 @@ export class ServerlessApiStack extends cdk.Stack {
 
     DataSource.createResolver({
       typeName: "Mutation",
+      fieldName: "deleteTodo",
+    });
+
+    DataSource.createResolver({
+      typeName: "Mutation",
       fieldName: "updateTodo",
     });
+
+    const todosTable = new dynamodb.Table(this, "Todos", {
+      partitionKey: {
+        name: "id",
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+    });
+ 
+    todosTable.grantFullAccess(lambdaFnTodos);
+    lambdaFnTodos.addEnvironment("TODOS_TABLE", todosTable.tableName);
   }
 }
